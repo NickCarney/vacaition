@@ -25,12 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PlaneTakeoff, TreePalmIcon as PalmTree } from "lucide-react";
 
 import { useLoadScript } from "@react-google-maps/api";
-import {
-  GoogleMap,
-  LoadScript,
-  DirectionsService,
-  DirectionsRenderer,
-} from "@react-google-maps/api";
+import { GoogleMap, DirectionsRenderer } from "@react-google-maps/api";
 
 export default function VacationFinder() {
   const [location, setLocation] = useState("Washington, DC");
@@ -67,6 +62,7 @@ export default function VacationFinder() {
     const formattedText = extractedText.replace(/\\n/g, "\n");
     const formattedText2 = formattedText.replace(/\\/g, "");
     const destinationMatch = formattedText2.match(/`([^```]+)```/);
+    setDestination(destinationMatch ? destinationMatch[1] : "");
     setDestinationRef(destinationMatch ? destinationMatch[1] : "");
     const detailsMatch = formattedText2.match(/\"([^"]+)\"/);
     const details = detailsMatch ? detailsMatch[1] : "";
