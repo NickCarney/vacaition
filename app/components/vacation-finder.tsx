@@ -24,8 +24,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { PlaneTakeoff, TreePalmIcon as PalmTree } from "lucide-react";
 
+import { useLoadScript } from "@react-google-maps/api";
+import {
+  GoogleMap,
+  LoadScript,
+  DirectionsService,
+  DirectionsRenderer,
+} from "@react-google-maps/api";
+
 export default function VacationFinder() {
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState("Washington, DC");
+  const [locationRef, setLocationRef] = useState("");
   const [transport, setTransport] = useState("");
   const [travelTime, setTravelTime] = useState("");
   const [timeUnit, setTimeUnit] = useState("hours");
@@ -33,13 +42,19 @@ export default function VacationFinder() {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const [response, setResponse] = useState("");
+  const [directionsResponse, setDirectionsResponse] =
+    useState<google.maps.DirectionsResult | null>(null);
+
+  const [destination, setDestination] = useState("Charlotte, NC");
+  const [destinationRef, setDestinationRef] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitted(true);
+    setLocation(locationRef);
     // In a real app, this would trigger a search or API call
     console.log({ location, transport, travelTime, timeUnit, activities });
-    const prompt = `Find exactly one vacation spot near ${location} that are accessible by ${transport} that is close to ${travelTime} ${timeUnit} away. The user is interested in activities like ${activities}.`;
+    const prompt = `Find exactly one vacation spot (NAME THE CITY, STATE, AND COUNTRY) near ${locationRef} that are accessible by ${transport} that is close to ${travelTime} ${timeUnit} away. The user is interested in activities like ${activities}. Put the destination between triple backticks. put details about this location between double quotes.`;
     const response = await fetch(`/api/find`, {
       method: "POST",
       headers: {
@@ -51,17 +66,67 @@ export default function VacationFinder() {
     const extractedText = data.match(/\"([\s\S]*?)\"/)?.[1] || "";
     const formattedText = extractedText.replace(/\\n/g, "\n");
     const formattedText2 = formattedText.replace(/\\/g, "");
+    const destinationMatch = formattedText2.match(/`([^```]+)```/);
+    setDestinationRef(destinationMatch ? destinationMatch[1] : "");
+    const detailsMatch = formattedText2.match(/\"([^"]+)\"/);
+    const details = detailsMatch ? detailsMatch[1] : "";
+    setResponse(details);
     setResponse(formattedText2);
+    console.log(destinationRef, response, details);
   };
 
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: "AIzaSyAPbtOmROtDP1K7SdLVLJnBOCOY1rHMXtg",
+  });
+
+  if (loadError) {
+    return <div>Error loading Google Maps</div>;
+  }
+
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
+
+  const directionsService = new window.google.maps.DirectionsService();
+
+  directionsService.route(
+    {
+      origin: location,
+      destination: destination,
+      travelMode: getTravelMode(transport),
+    },
+    (result, status) => {
+      if (status === window.google.maps.DirectionsStatus.OK) {
+        setDirectionsResponse(result);
+      } else {
+        console.error(`Error fetching directions: ${status}`);
+      }
+    }
+  );
+
+  function getTravelMode(transport: string): google.maps.TravelMode {
+    switch (transport) {
+      case "DRIVING":
+        return window.google.maps.TravelMode.DRIVING;
+      case "BICYCLING":
+        return window.google.maps.TravelMode.BICYCLING;
+      case "TRANSIT":
+        return window.google.maps.TravelMode.TRANSIT;
+      case "WALKING":
+        return window.google.maps.TravelMode.WALKING;
+      default:
+        return window.google.maps.TravelMode.DRIVING; // Default to DRIVING
+    }
+  }
+
   return (
-    <div>
-      <Card className="w-full max-w-lg shadow-lg">
+    <div className="flex flex-row w-full gap-4">
+      <Card className="w-[50%] shadow-lg">
         <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-t-lg">
           <div className="flex items-center gap-2">
             <PalmTree className="h-6 w-6 text-emerald-600" />
             <CardTitle className="text-2xl text-emerald-700 text-center">
-              VacAIton
+              Vac<span className="text-[#123456] font-serif">AI</span>ton
             </CardTitle>
           </div>
           <CardDescription>
@@ -78,8 +143,8 @@ export default function VacationFinder() {
                 <Input
                   id="location"
                   placeholder="Enter your current location"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  value={locationRef}
+                  onChange={(e) => setLocationRef(e.target.value)}
                   required
                 />
               </div>
@@ -95,7 +160,6 @@ export default function VacationFinder() {
                     <SelectItem value="car">Car</SelectItem>
                     <SelectItem value="bike">Bike</SelectItem>
                     <SelectItem value="train">Train</SelectItem>
-                    <SelectItem value="cruise">Cruise</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -162,10 +226,23 @@ export default function VacationFinder() {
               </strong>
               , with activities like <strong>{activities}</strong>.
             </p>
-            <p>{response}</p>
           </div>
         )}
       </Card>
+      <div className="w-full">
+        {response}
+        {isSubmitted && (
+          <GoogleMap
+            //   center={{ lat: 40.7128, lng: -74.006 }}
+            zoom={10}
+            mapContainerStyle={{ width: "100%", height: "500px" }}
+          >
+            {directionsResponse && (
+              <DirectionsRenderer directions={directionsResponse} />
+            )}
+          </GoogleMap>
+        )}
+      </div>
     </div>
   );
 }
