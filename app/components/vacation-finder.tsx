@@ -76,7 +76,7 @@ export default function VacationFinder() {
   };
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: "AIzaSyAPbtOmROtDP1K7SdLVLJnBOCOY1rHMXtg",
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY!,
   });
 
   if (loadError) {
