@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -41,15 +41,22 @@ export default function VacationFinder() {
     useState<google.maps.DirectionsResult | null>(null);
 
   const [destination, setDestination] = useState("Charlotte, NC");
-  const [destinationRef, setDestinationRef] = useState("");
+  const [suggestions, setSuggestions] = useState<{ destination: string }[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
+
+    setTimeout(() => {
+      console.log("Delayed for 3 second.");
+      setIsSubmitted(true);
+    }, 3000);
+
     setLocation(locationRef);
     // In a real app, this would trigger a search or API call
     console.log({ location, transport, travelTime, timeUnit, activities });
-    const prompt = `Find exactly one vacation spot (NAME THE CITY, STATE, AND COUNTRY) near ${locationRef} that are accessible by ${transport} that is close to ${travelTime} ${timeUnit} away. The user is interested in activities like ${activities}. Put the destination between triple backticks. put details about this location between double quotes.`;
+    const prompt = `Find exactly one vacation spot (NAME THE CITY, STATE, AND COUNTRY) near ${locationRef} that are accessible by ${transport} that is close to ${travelTime} ${timeUnit} away. The user is interested in activities like ${activities}. Put the destination between triple backticks. put details about this location between double quotes. You have suggested ${JSON.stringify(
+      suggestions
+    )} already do not suggest these again please.`;
     const response = await fetch(`/api/find`, {
       method: "POST",
       headers: {
@@ -58,22 +65,43 @@ export default function VacationFinder() {
       body: JSON.stringify({ prompt: prompt }),
     });
     const data = await response.text();
+    console.log(data);
     const extractedText = data.match(/\"([\s\S]*?)\"/)?.[1] || "";
     const formattedText = extractedText.replace(/\\n/g, "\n");
     const formattedText2 = formattedText.replace(/\\/g, "");
-    const destinationMatch = formattedText2.match(/`([^```]+)```/);
-    setDestination(destinationMatch ? destinationMatch[1] : "");
-    setDestinationRef(destinationMatch ? destinationMatch[1] : "");
-    const detailsMatch = formattedText2.match(/\"([^"]+)\"/);
-    const details = detailsMatch ? detailsMatch[1] : "";
-    setResponse(details);
-    setResponse(formattedText2);
-    console.log(destinationRef, response, details);
+    const destinationMatch = formattedText2.match(/```([\s\S]*?)```/);
+    setDestination(destinationMatch ? destinationMatch[1].trim() : "");
+    setSuggestions([...suggestions, { destination }]);
+    const desc = data.split('"')[2];
+    setResponse(desc);
+    // setResponse(formattedText2);
   };
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY!,
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
   });
+  useEffect(() => {
+    if (!isLoaded || !location || !destination || !transport) return;
+    if (typeof window === "undefined" || !window.google?.maps) return;
+
+    const directionsService = new window.google.maps.DirectionsService();
+
+    directionsService.route(
+      {
+        origin: location,
+        destination: destination,
+        travelMode: getTravelMode(transport),
+      },
+      (result, status) => {
+        if (status === window.google.maps.DirectionsStatus.OK) {
+          setDirectionsResponse(result);
+        } else {
+          setLocation(destination);
+          console.log(`Error fetching directions: ${status}`);
+        }
+      }
+    );
+  }, [isLoaded, isSubmitted, location, destination, transport]);
 
   if (loadError) {
     return <div>Error loading Google Maps</div>;
@@ -82,23 +110,6 @@ export default function VacationFinder() {
   if (!isLoaded) {
     return <div>Loading...</div>;
   }
-
-  const directionsService = new window.google.maps.DirectionsService();
-
-  directionsService.route(
-    {
-      origin: location,
-      destination: destination,
-      travelMode: getTravelMode(transport),
-    },
-    (result, status) => {
-      if (status === window.google.maps.DirectionsStatus.OK) {
-        setDirectionsResponse(result);
-      } else {
-        console.error(`Error fetching directions: ${status}`);
-      }
-    }
-  );
 
   function getTravelMode(transport: string): google.maps.TravelMode {
     switch (transport) {
@@ -122,7 +133,7 @@ export default function VacationFinder() {
           <div className="flex items-center gap-2">
             <PalmTree className="h-6 w-6 text-emerald-600" />
             <CardTitle className="text-2xl text-emerald-700 text-center">
-              Vac<span className="text-[#123456] font-serif">AI</span>ton
+              Vac<span className="text-[#123456] font-serif">AI</span>tion
             </CardTitle>
           </div>
           <CardDescription>
@@ -226,17 +237,31 @@ export default function VacationFinder() {
         )}
       </Card>
       <div className="w-full">
-        {response}
         {isSubmitted && (
-          <GoogleMap
-            //   center={{ lat: 40.7128, lng: -74.006 }}
-            zoom={10}
-            mapContainerStyle={{ width: "100%", height: "500px" }}
-          >
-            {directionsResponse && (
-              <DirectionsRenderer directions={directionsResponse} />
-            )}
-          </GoogleMap>
+          <div>
+            <p>
+              {destination}
+              <br />
+              {response}
+            </p>
+            <GoogleMap
+              // center={{ lat: 40.7128, lng: -74.006 }}
+              // zoom={10}
+              mapContainerStyle={{ width: "100%", height: "500px" }}
+              options={{
+                draggable: true,
+                scrollwheel: true,
+                disableDefaultUI: false,
+              }}
+            >
+              {directionsResponse && (
+                <DirectionsRenderer directions={directionsResponse} />
+              )}
+            </GoogleMap>
+          </div>
+        )}
+        {isSubmitted && (
+          <Button onClick={handleSubmit}>Not a fan? Try again!</Button>
         )}
       </div>
     </div>
