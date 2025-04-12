@@ -127,8 +127,8 @@ export default function VacationFinder() {
   }
 
   return (
-    <div className="flex flex-row w-full gap-4">
-      <Card className="w-[50%] shadow-lg">
+    <div className="flex sm:flex-row flex-col w-full gap-4">
+      <Card className="sm:w-[50%] shadow-lg">
         <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-t-lg">
           <div className="flex items-center gap-2">
             <PalmTree className="h-6 w-6 text-emerald-600" />
