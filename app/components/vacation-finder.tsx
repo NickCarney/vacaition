@@ -260,9 +260,9 @@ export default function VacationFinder() {
             </GoogleMap>
           </div>
         )}
-        {isSubmitted && (
+        {/* {isSubmitted && (
           <Button onClick={handleSubmit}>Not a fan? Try again!</Button>
-        )}
+        )} */}
       </div>
     </div>
   );
