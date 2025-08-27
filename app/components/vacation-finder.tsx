@@ -128,7 +128,7 @@ export default function VacationFinder() {
 
   return (
     <div className="flex sm:flex-row flex-col w-full gap-4">
-      <Card className="sm:w-[50%] shadow-lg">
+      <Card className="sm:w-full shadow-lg">
         <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-t-lg">
           <div className="flex items-center gap-2">
             <PalmTree className="h-6 w-6 text-emerald-600" />
@@ -236,8 +236,9 @@ export default function VacationFinder() {
           </div>
         )}
       </Card>
-      <div className="w-full">
-        {isSubmitted && (
+
+      {isSubmitted && (
+        <div className="w-full">
           <div>
             <p>
               {destination}
@@ -259,11 +260,11 @@ export default function VacationFinder() {
               )}
             </GoogleMap>
           </div>
-        )}
-        {/* {isSubmitted && (
+        </div>
+      )}
+      {/* {isSubmitted && (
           <Button onClick={handleSubmit}>Not a fan? Try again!</Button>
         )} */}
-      </div>
     </div>
   );
 }

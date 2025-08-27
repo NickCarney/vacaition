@@ -6,16 +6,23 @@ export async function POST(request: Request) {
   const { prompt } = await request.json();
 
   try {
-    const response = await client.responses.create({
-      model: "gpt-4o-mini",
-      input: prompt,
+    const response = await client.chat.completions.create({
+      model: "gpt-4.1-nano",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 1000,
     });
 
-    console.log(response.output_text);
+    const content = response.choices[0]?.message?.content || "";
+    console.log(content);
 
-    return Response.json(response.output_text);
+    return Response.json(content);
   } catch (error) {
-    console.error("Resend error:", error);
+    console.error("OpenAI API error:", error);
     return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
