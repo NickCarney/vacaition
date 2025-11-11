@@ -35,6 +35,7 @@ export default function VacationFinder() {
   const [timeUnit, setTimeUnit] = useState("hours");
   const [activities, setActivities] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [response, setResponse] = useState("");
   const [directionsResponse, setDirectionsResponse] =
@@ -46,7 +47,7 @@ export default function VacationFinder() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    setIsLoading(true);
     setIsMapReady(false);
     setTimeout(() => {
       console.log("Delayed for 3 second.");
@@ -54,29 +55,45 @@ export default function VacationFinder() {
     }, 3000);
 
     setLocation(locationRef);
-    // In a real app, this would trigger a search or API call
     console.log({ location, transport, travelTime, timeUnit, activities });
-    const prompt = `Find exactly one vacation spot (NAME THE CITY, STATE, AND COUNTRY) near ${locationRef} that are accessible by ${transport} that is close to ${travelTime} ${timeUnit} away. The user is interested in activities like ${activities}. Put the destination between triple backticks. put details about this location between double quotes. You have suggested ${JSON.stringify(
-      suggestions
-    )} already do not suggest these again please.`;
-    const response = await fetch(`/api/find`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt: prompt }),
-    });
-    const data = await response.text();
-    console.log(data);
-    const extractedText = data.match(/\"([\s\S]*?)\"/)?.[1] || "";
-    const formattedText = extractedText.replace(/\\n/g, "\n");
-    const formattedText2 = formattedText.replace(/\\/g, "");
-    const destinationMatch = formattedText2.match(/```([\s\S]*?)```/);
-    setDestination(destinationMatch ? destinationMatch[1].trim() : "");
-    setSuggestions([...suggestions, { destination }]);
-    const desc = data.split('"')[2];
-    setResponse(desc);
-    // setResponse(formattedText2);
+
+    try {
+      const response = await fetch(`/api/find`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          location: locationRef,
+          transport: transport,
+          travelTime: travelTime,
+          timeUnit: timeUnit,
+          activities: activities,
+          previousSuggestions: suggestions.map(s => s.destination),
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Parsed response:", data);
+
+      if (data.destination && data.description) {
+        setDestination(data.destination);
+        setResponse(data.description);
+        setSuggestions([...suggestions, { destination: data.destination }]);
+      } else if (data.error) {
+        setDestination("Error");
+        setResponse(data.error);
+      } else {
+        setDestination("Error");
+        setResponse("Unexpected response format");
+      }
+    } catch (error) {
+      console.error("Error fetching vacation:", error);
+      setDestination("Error");
+      setResponse("Failed to fetch vacation destination. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const { isLoaded, loadError } = useLoadScript({
@@ -220,10 +237,11 @@ export default function VacationFinder() {
           <Button
             type="submit"
             onClick={handleSubmit}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={isLoading}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
           >
             <PlaneTakeoff className="mr-2 h-4 w-4" />
-            Find Vacations
+            {isLoading ? "Searching..." : "Find Vacations"}
           </Button>
         </CardFooter>
 

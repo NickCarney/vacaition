@@ -9,7 +9,7 @@ import { MapPin, PlaneTakeoff } from "lucide-react";
 export default function Home() {
   const [activeComponent, setActiveComponent] = useState<
     "vacation" | "activity"
-  >("vacation");
+  >("activity");
 
   return (
     <main className="flex min-h-screen flex-col p-4 sm:w-[70%] sm:justify-center">
