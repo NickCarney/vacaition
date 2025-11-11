@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPin, ExternalLink, Search } from "lucide-react";
 
@@ -27,6 +34,8 @@ interface ActivityRecommendation {
 export default function ActivityFinder() {
   const [destination, setDestination] = useState("");
   const [activities, setActivities] = useState("");
+  const [travelDistance, setTravelDistance] = useState("");
+  const [distanceUnit, setDistanceUnit] = useState("miles");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<
@@ -46,38 +55,34 @@ export default function ActivityFinder() {
         body: JSON.stringify({
           destination: destination,
           activities: activities,
+          travelDistance: travelDistance,
+          distanceUnit: distanceUnit,
         }),
       });
 
-      const data = await response.text();
-      console.log("Raw response:", data);
+      const data = await response.json();
+      console.log("Parsed response:", data);
 
-      // Try to extract JSON from the response
-      let parsedRecommendations: ActivityRecommendation[] = [];
-      try {
-        // Look for JSON array in the response
-        const jsonMatch = data.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          parsedRecommendations = JSON.parse(jsonMatch[0]);
-        } else {
-          // If no JSON found, parse as text and create manual structure
-          const lines = data.split("\n").filter((line) => line.trim());
-          parsedRecommendations = lines.slice(0, 5).map((line, index) => ({
-            name: `Recommendation ${index + 1}`,
-            description: line.trim(),
-          }));
-        }
-      } catch (parseError) {
-        console.error("JSON parsing failed:", parseError);
-        // Fallback: split response into recommendations
-        const lines = data.split("\n").filter((line) => line.trim());
-        parsedRecommendations = lines.slice(0, 5).map((line, index) => ({
-          name: `Activity Option ${index + 1}`,
-          description: line.trim(),
-        }));
+      // Check if the response is an array of recommendations
+      if (Array.isArray(data)) {
+        setRecommendations(data);
+      } else if (data.error) {
+        // Handle error response from API
+        setRecommendations([
+          {
+            name: "Error",
+            description: data.error,
+          },
+        ]);
+      } else {
+        // Unexpected format
+        setRecommendations([
+          {
+            name: "Error",
+            description: "Unexpected response format",
+          },
+        ]);
       }
-
-      setRecommendations(parsedRecommendations);
       setIsSubmitted(true);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
@@ -110,7 +115,7 @@ export default function ActivityFinder() {
             </CardTitle>
           </div>
           <CardDescription>
-            Get specific activity recommendations for your destination
+            Discover what to do near you based on your location and interests
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
@@ -118,15 +123,42 @@ export default function ActivityFinder() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="destination">
-                  Where are you planning to visit?
+                  Where are you currently located?
                 </Label>
                 <Input
                   id="destination"
-                  placeholder="e.g., Yellowstone National Park, New York City, Paris..."
+                  placeholder="e.g., Washington DC, New York City, Los Angeles..."
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="travelDistance">
+                  How far are you willing to travel?
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="travelDistance"
+                    type="number"
+                    placeholder="Enter distance"
+                    className="flex-1"
+                    min="1"
+                    value={travelDistance}
+                    onChange={(e) => setTravelDistance(e.target.value)}
+                    required
+                  />
+                  <Select value={distanceUnit} onValueChange={setDistanceUnit}>
+                    <SelectTrigger className="w-[110px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="miles">Miles</SelectItem>
+                      <SelectItem value="kilometers">Kilometers</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -153,7 +185,7 @@ export default function ActivityFinder() {
             className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
           >
             <Search className="mr-2 h-4 w-4" />
-            {isLoading ? "Searching..." : "Find Activities"}
+            {isLoading ? "Searching..." : "Find Things to Do"}
           </Button>
         </CardFooter>
       </Card>
@@ -163,10 +195,10 @@ export default function ActivityFinder() {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl text-blue-700">
-                Recommendations for {destination}
+                Recommendations near {destination}
               </CardTitle>
               <CardDescription>
-                Here are specific places and activities for {activities}
+                Places within {travelDistance} {distanceUnit} for {activities}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -210,7 +242,7 @@ export default function ActivityFinder() {
                 variant="outline"
                 className="border-blue-600 text-blue-600 hover:bg-blue-50"
               >
-                Try Different Activities
+                Search Again
               </Button>
             </CardFooter>
           </Card>

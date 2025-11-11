@@ -39,13 +39,15 @@ export default function VacationFinder() {
   const [response, setResponse] = useState("");
   const [directionsResponse, setDirectionsResponse] =
     useState<google.maps.DirectionsResult | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
-  const [destination, setDestination] = useState("Charlotte, NC");
+  const [destination, setDestination] = useState("");
   const [suggestions, setSuggestions] = useState<{ destination: string }[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    setIsMapReady(false);
     setTimeout(() => {
       console.log("Delayed for 3 second.");
       setIsSubmitted(true);
@@ -95,9 +97,11 @@ export default function VacationFinder() {
       (result, status) => {
         if (status === window.google.maps.DirectionsStatus.OK) {
           setDirectionsResponse(result);
+          setIsMapReady(true);
         } else {
           setLocation(destination);
           console.log(`Error fetching directions: ${status}`);
+          setIsMapReady(true);
         }
       }
     );
@@ -245,20 +249,27 @@ export default function VacationFinder() {
               <br />
               {response}
             </p>
-            <GoogleMap
-              // center={{ lat: 40.7128, lng: -74.006 }}
-              // zoom={10}
-              mapContainerStyle={{ width: "100%", height: "500px" }}
-              options={{
-                draggable: true,
-                scrollwheel: true,
-                disableDefaultUI: false,
-              }}
-            >
-              {directionsResponse && (
-                <DirectionsRenderer directions={directionsResponse} />
-              )}
-            </GoogleMap>
+            {!isMapReady && (
+              <div className="flex items-center justify-center w-full h-[500px] bg-gray-100 rounded-lg">
+                <p className="text-gray-600">Loading map...</p>
+              </div>
+            )}
+            {isMapReady && (
+              <GoogleMap
+                // center={{ lat: 40.7128, lng: -74.006 }}
+                // zoom={10}
+                mapContainerStyle={{ width: "100%", height: "500px" }}
+                options={{
+                  draggable: true,
+                  scrollwheel: true,
+                  disableDefaultUI: false,
+                }}
+              >
+                {directionsResponse && (
+                  <DirectionsRenderer directions={directionsResponse} />
+                )}
+              </GoogleMap>
+            )}
           </div>
         </div>
       )}

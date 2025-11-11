@@ -7,14 +7,15 @@ export async function POST(request: Request) {
 
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-4.1-nano",
+      model: "gpt-5-nano",
       messages: [
         {
           role: "user",
           content: prompt,
         },
       ],
-      max_tokens: 1000,
+      reasoning_effort: "low",
+      // max_tokens: 1000,
     });
 
     const content = response.choices[0]?.message?.content || "";
