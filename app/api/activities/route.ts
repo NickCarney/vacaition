@@ -1,3 +1,4 @@
+export const runtime = "edge";
 import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -49,7 +50,10 @@ Respond ONLY with the JSON array, no additional text.`;
       return Response.json(parsedContent);
     } catch (parseError) {
       console.error("Failed to parse OpenAI response:", parseError);
-      return Response.json({ error: "Invalid response format" }, { status: 500 });
+      return Response.json(
+        { error: "Invalid response format" },
+        { status: 500 }
+      );
     }
   } catch (error) {
     console.error("OpenAI API error:", error);
