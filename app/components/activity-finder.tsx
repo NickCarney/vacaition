@@ -41,9 +41,58 @@ export default function ActivityFinder() {
   const [recommendations, setRecommendations] = useState<
     ActivityRecommendation[]
   >([]);
+  const [errors, setErrors] = useState({
+    destination: "",
+    travelDistance: "",
+    activities: "",
+  });
+
+  const validateInputs = () => {
+    const newErrors = {
+      destination: "",
+      travelDistance: "",
+      activities: "",
+    };
+
+    // Validate destination
+    if (!destination.trim()) {
+      newErrors.destination = "Please enter a destination";
+    } else if (destination.trim().length < 2) {
+      newErrors.destination = "Destination must be at least 2 characters";
+    }
+
+    // Validate travel distance
+    const distance = Number(travelDistance);
+    if (!travelDistance) {
+      newErrors.travelDistance = "Please enter a travel distance";
+    } else if (isNaN(distance) || distance <= -1) {
+      newErrors.travelDistance = "Distance must be a positive number";
+    } else if (distance > 10000) {
+      newErrors.travelDistance = "Distance seems too large (max 10,000)";
+    }
+
+    // Validate activities
+    if (!activities.trim()) {
+      newErrors.activities = "Please enter at least one activity";
+    } else if (activities.trim().length < 3) {
+      newErrors.activities = "Please provide more detail about activities";
+    }
+
+    setErrors(newErrors);
+    return (
+      !newErrors.destination &&
+      !newErrors.travelDistance &&
+      !newErrors.activities
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateInputs()) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -102,10 +151,11 @@ export default function ActivityFinder() {
   const handleTryAgain = () => {
     setIsSubmitted(false);
     setRecommendations([]);
+    setErrors({ destination: "", travelDistance: "", activities: "" });
   };
 
   return (
-    <div className="flex flex-col w-full gap-4">
+    <div className="flex flex-col gap-4">
       <Card className="shadow-lg">
         <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-lg">
           <div className="flex items-center gap-2">
@@ -129,9 +179,18 @@ export default function ActivityFinder() {
                   id="destination"
                   placeholder="e.g., Washington DC, New York City, Los Angeles..."
                   value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
+                  onChange={(e) => {
+                    setDestination(e.target.value);
+                    if (errors.destination) {
+                      setErrors({ ...errors, destination: "" });
+                    }
+                  }}
                   required
+                  className={errors.destination ? "border-red-500" : ""}
                 />
+                {errors.destination && (
+                  <p className="text-sm text-red-600">{errors.destination}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -143,14 +202,22 @@ export default function ActivityFinder() {
                     id="travelDistance"
                     type="number"
                     placeholder="Enter distance"
-                    className="flex-1"
+                    className={` ${
+                      errors.travelDistance ? "border-red-500" : ""
+                    }`}
                     min="1"
+                    max="1000"
                     value={travelDistance}
-                    onChange={(e) => setTravelDistance(e.target.value)}
+                    onChange={(e) => {
+                      setTravelDistance(e.target.value);
+                      if (errors.travelDistance) {
+                        setErrors({ ...errors, travelDistance: "" });
+                      }
+                    }}
                     required
                   />
                   <Select value={distanceUnit} onValueChange={setDistanceUnit}>
-                    <SelectTrigger className="w-[110px]">
+                    <SelectTrigger className="">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -159,6 +226,11 @@ export default function ActivityFinder() {
                     </SelectContent>
                   </Select>
                 </div>
+                {errors.travelDistance && (
+                  <p className="text-sm text-red-600">
+                    {errors.travelDistance}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -168,11 +240,21 @@ export default function ActivityFinder() {
                 <Textarea
                   id="activities"
                   placeholder="e.g., camping, swimming, hiking, restaurants, museums, nightlife..."
-                  className="min-h-[100px]"
+                  className={`min-h-[100px] ${
+                    errors.activities ? "border-red-500" : ""
+                  }`}
                   value={activities}
-                  onChange={(e) => setActivities(e.target.value)}
+                  onChange={(e) => {
+                    setActivities(e.target.value);
+                    if (errors.activities) {
+                      setErrors({ ...errors, activities: "" });
+                    }
+                  }}
                   required
                 />
+                {errors.activities && (
+                  <p className="text-sm text-red-600">{errors.activities}</p>
+                )}
               </div>
             </div>
           </form>
@@ -209,13 +291,11 @@ export default function ActivityFinder() {
                     className="p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                      <div className="">
                         <h3 className="font-semibold text-lg text-gray-900 mb-2">
                           {rec.name}
                         </h3>
-                        <p className="text-gray-700 mb-2 w-full">
-                          {rec.description}
-                        </p>
+                        <p className="text-gray-700 mb-2">{rec.description}</p>
                         {rec.location && (
                           <div className="flex items-center justify-center flex-wrap text-center">
                             <p className="text-sm text-gray-600">
