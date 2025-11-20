@@ -213,24 +213,28 @@ export default function ActivityFinder() {
                         <h3 className="font-semibold text-lg text-gray-900 mb-2">
                           {rec.name}
                         </h3>
-                        <p className="text-gray-700 mb-2">{rec.description}</p>
+                        <p className="text-gray-700 mb-2 w-full">
+                          {rec.description}
+                        </p>
                         {rec.location && (
-                          <p className="text-sm text-gray-600 mb-2">
-                            📍 {rec.location}
-                          </p>
+                          <div className="flex items-center justify-center flex-wrap text-center">
+                            <p className="text-sm text-gray-600">
+                              {rec.location}
+                            </p>
+                            {rec.website && (
+                              <a
+                                href={rec.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-4 flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                              >
+                                Visit Website
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
                         )}
                       </div>
-                      {rec.website && (
-                        <a
-                          href={rec.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-4 flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
-                        >
-                          Visit Website
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
                     </div>
                   </div>
                 ))}
