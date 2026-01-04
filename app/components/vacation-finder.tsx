@@ -49,11 +49,15 @@ export default function VacationFinder() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [vacationSuggestions, setVacationSuggestions] = useState<VacationSuggestion[]>([]);
+  const [vacationSuggestions, setVacationSuggestions] = useState<
+    VacationSuggestion[]
+  >([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<MarkerData | null>(null);
-  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral | null>(null);
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral | null>(
+    null
+  );
   const mapRef = useRef<google.maps.Map | null>(null);
   const [errors, setErrors] = useState({
     location: "",
@@ -138,7 +142,10 @@ export default function VacationFinder() {
             travelTime: travelTime,
             timeUnit: timeUnit,
             activities: activities,
-            previousSuggestions: [...previousDestinations, ...newSuggestions.map(s => s.destination)],
+            previousSuggestions: [
+              ...previousDestinations,
+              ...newSuggestions.map((s) => s.destination),
+            ],
           }),
         });
 
@@ -156,10 +163,13 @@ export default function VacationFinder() {
       setIsSubmitted(true);
     } catch (error) {
       console.error("Error fetching vacations:", error);
-      setVacationSuggestions([{
-        destination: "Error",
-        description: "Failed to fetch vacation destinations. Please try again.",
-      }]);
+      setVacationSuggestions([
+        {
+          destination: "Error",
+          description:
+            "Failed to fetch vacation destinations. Please try again.",
+        },
+      ]);
       setIsSubmitted(true);
     } finally {
       setIsLoading(false);
@@ -252,13 +262,12 @@ export default function VacationFinder() {
     return <div>Loading...</div>;
   }
 
-
   return (
     <div className="space-y-6">
       {/* Top Section: Form (left) and Map (right) */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Form Card */}
-        <Card className="lg:w-1/2 shadow-xl hover:shadow-2xl transition-shadow duration-300 border-0">
+        <Card className="lg:w-full shadow-xl hover:shadow-2xl transition-shadow duration-300 border-0">
           <CardHeader className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-t-lg">
             <div className="flex items-center gap-2 justify-center">
               <PalmTree className="h-7 w-7 text-emerald-600" />
@@ -339,7 +348,9 @@ export default function VacationFinder() {
                         </SelectContent>
                       </Select>
                       {errors.transport && (
-                        <p className="text-sm text-red-600">{errors.transport}</p>
+                        <p className="text-sm text-red-600">
+                          {errors.transport}
+                        </p>
                       )}
                     </div>
 
@@ -458,7 +469,8 @@ export default function VacationFinder() {
                 Vacation Destinations
               </CardTitle>
               <CardDescription className="text-base">
-                Explore {vacationSuggestions.length} vacation options from {location}
+                Explore {vacationSuggestions.length} vacation options from{" "}
+                {location}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
