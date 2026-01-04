@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,11 +24,23 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { MapPin, ExternalLink, Search } from "lucide-react";
 
+import { useLoadScript } from "@react-google-maps/api";
+import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
+
 interface ActivityRecommendation {
   name: string;
   description: string;
   website?: string;
   location?: string;
+}
+
+interface MarkerData {
+  position: google.maps.LatLngLiteral;
+  name: string;
+  description: string;
+  website?: string;
+  location?: string;
+  isOrigin?: boolean;
 }
 
 export default function ActivityFinder() {
@@ -46,6 +58,97 @@ export default function ActivityFinder() {
     travelDistance: "",
     activities: "",
   });
+
+  const [markers, setMarkers] = useState<MarkerData[]>([]);
+  const [selectedMarker, setSelectedMarker] = useState<MarkerData | null>(null);
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral | null>(
+    null
+  );
+  const [isMapReady, setIsMapReady] = useState(false);
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+  });
+
+  // Geocode an address to get lat/lng
+  const geocodeAddress = async (
+    address: string
+  ): Promise<google.maps.LatLngLiteral | null> => {
+    if (!window.google?.maps) return null;
+
+    const geocoder = new window.google.maps.Geocoder();
+    return new Promise((resolve) => {
+      geocoder.geocode({ address }, (results, status) => {
+        if (status === "OK" && results && results[0]) {
+          const location = results[0].geometry.location;
+          resolve({ lat: location.lat(), lng: location.lng() });
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  };
+
+  // Effect to geocode all activities and the starting location
+  useEffect(() => {
+    if (!isLoaded || !isSubmitted || recommendations.length === 0) return;
+
+    const geocodeActivities = async () => {
+      setIsMapReady(false);
+      const newMarkers: MarkerData[] = [];
+
+      // Geocode the starting location (destination)
+      const originCoords = await geocodeAddress(destination);
+      if (originCoords) {
+        newMarkers.push({
+          position: originCoords,
+          name: destination,
+          description: "Your starting location",
+          isOrigin: true,
+        });
+        setMapCenter(originCoords);
+      }
+
+      // Geocode all activity locations
+      for (const rec of recommendations) {
+        if (rec.location) {
+          const coords = await geocodeAddress(rec.location);
+          if (coords) {
+            newMarkers.push({
+              position: coords,
+              name: rec.name,
+              description: rec.description,
+              website: rec.website,
+              location: rec.location,
+              isOrigin: false,
+            });
+          }
+        }
+      }
+
+      setMarkers(newMarkers);
+      setIsMapReady(true);
+    };
+
+    geocodeActivities();
+  }, [isLoaded, isSubmitted, recommendations, destination]);
+
+  // Auto-zoom map to fit all markers
+  useEffect(() => {
+    if (!mapRef.current || markers.length === 0) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    markers.forEach((marker) => {
+      bounds.extend(marker.position);
+    });
+
+    mapRef.current.fitBounds(bounds);
+
+    // Add padding around the bounds
+    const padding = { top: 50, right: 50, bottom: 50, left: 50 };
+    mapRef.current.fitBounds(bounds, padding);
+  }, [markers]);
 
   const validateInputs = () => {
     const newErrors = {
@@ -110,7 +213,6 @@ export default function ActivityFinder() {
       });
 
       const data = await response.json();
-      console.log("Parsed response:", data);
 
       // Check if the response is an array of recommendations
       if (Array.isArray(data)) {
@@ -134,7 +236,6 @@ export default function ActivityFinder() {
       }
       setIsSubmitted(true);
     } catch (error) {
-      console.error("Error fetching recommendations:", error);
       setRecommendations([
         {
           name: "Error",
@@ -152,7 +253,20 @@ export default function ActivityFinder() {
     setIsSubmitted(false);
     setRecommendations([]);
     setErrors({ destination: "", travelDistance: "", activities: "" });
+    setMarkers([]);
+    setSelectedMarker(null);
+    setMapCenter(null);
+    setIsMapReady(false);
+    mapRef.current = null;
   };
+
+  if (loadError) {
+    return <div>Error loading Google Maps</div>;
+  }
+
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -223,6 +337,8 @@ export default function ActivityFinder() {
                     <SelectContent>
                       <SelectItem value="miles">Miles</SelectItem>
                       <SelectItem value="kilometers">Kilometers</SelectItem>
+                      <SelectItem value="minutes">Minutes</SelectItem>
+                      <SelectItem value="hours">Hours</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -274,6 +390,95 @@ export default function ActivityFinder() {
 
       {isSubmitted && (
         <div className="space-y-4">
+          {/* Map Component */}
+          {markers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl text-blue-700">
+                  Activity Map
+                </CardTitle>
+                <CardDescription>
+                  Locations of activities near {destination}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!isMapReady && (
+                  <div className="flex items-center justify-center w-full h-[500px] bg-gray-100 rounded-lg">
+                    <p className="text-gray-600">Loading map...</p>
+                  </div>
+                )}
+                {isMapReady && mapCenter && (
+                  <GoogleMap
+                    center={mapCenter}
+                    zoom={11}
+                    mapContainerStyle={{ width: "100%", height: "500px" }}
+                    options={{
+                      draggable: true,
+                      scrollwheel: true,
+                      disableDefaultUI: false,
+                    }}
+                    onLoad={(map) => {
+                      mapRef.current = map;
+                    }}
+                  >
+                    {markers.map((marker, index) => (
+                      <Marker
+                        key={`${marker.name}-${index}`}
+                        position={marker.position}
+                        title={marker.name}
+                        icon={
+                          marker.isOrigin
+                            ? {
+                                url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                              }
+                            : {
+                                url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
+                              }
+                        }
+                        onClick={() => setSelectedMarker(marker)}
+                        onMouseOver={() => setSelectedMarker(marker)}
+                      />
+                    ))}
+
+                    {selectedMarker && (
+                      <InfoWindow
+                        position={selectedMarker.position}
+                        onCloseClick={() => setSelectedMarker(null)}
+                        options={{
+                          pixelOffset: new window.google.maps.Size(0, -30),
+                        }}
+                      >
+                        <div className="p-2 max-w-xs">
+                          <h3 className="font-semibold text-base mb-1">
+                            {selectedMarker.name}
+                          </h3>
+                          <p className="text-sm text-gray-700 mb-1">
+                            {selectedMarker.description}
+                          </p>
+                          {selectedMarker.location && (
+                            <p className="text-xs text-gray-600 mb-1">
+                              {selectedMarker.location}
+                            </p>
+                          )}
+                          {selectedMarker.website && (
+                            <a
+                              href={selectedMarker.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            >
+                              Visit Website
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </InfoWindow>
+                    )}
+                  </GoogleMap>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="text-xl text-blue-700">
