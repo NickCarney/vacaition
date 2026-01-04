@@ -269,24 +269,27 @@ export default function ActivityFinder() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-lg">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-6 w-6 text-blue-600" />
-            <CardTitle className="text-2xl text-blue-700 text-center">
+    <div className="flex flex-col gap-6">
+      <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300 border-0">
+        <CardHeader className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 rounded-t-lg">
+          <div className="flex items-center gap-2 justify-center">
+            <MapPin className="h-7 w-7 text-blue-600" />
+            <CardTitle className="text-3xl text-blue-700">
               Vac<span className="text-[#123456] font-serif">AI</span>tion
             </CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-center text-base mt-2">
             Discover what to do near you based on your location and interests
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 pb-6">
           <form onSubmit={handleSubmit}>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="destination">
+                <Label
+                  htmlFor="destination"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   Where are you currently located?
                 </Label>
                 <Input
@@ -300,7 +303,11 @@ export default function ActivityFinder() {
                     }
                   }}
                   required
-                  className={errors.destination ? "border-red-500" : ""}
+                  className={`transition-all duration-200 ${
+                    errors.destination
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "focus-visible:ring-blue-500"
+                  }`}
                 />
                 {errors.destination && (
                   <p className="text-sm text-red-600">{errors.destination}</p>
@@ -308,7 +315,10 @@ export default function ActivityFinder() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="travelDistance">
+                <Label
+                  htmlFor="travelDistance"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   How far are you willing to travel?
                 </Label>
                 <div className="flex gap-2">
@@ -316,8 +326,10 @@ export default function ActivityFinder() {
                     id="travelDistance"
                     type="number"
                     placeholder="Enter distance"
-                    className={` ${
-                      errors.travelDistance ? "border-red-500" : ""
+                    className={`flex-1 transition-all duration-200 ${
+                      errors.travelDistance
+                        ? "border-red-500 focus-visible:ring-red-500"
+                        : "focus-visible:ring-blue-500"
                     }`}
                     min="1"
                     max="1000"
@@ -331,7 +343,7 @@ export default function ActivityFinder() {
                     required
                   />
                   <Select value={distanceUnit} onValueChange={setDistanceUnit}>
-                    <SelectTrigger className="">
+                    <SelectTrigger className="w-[140px] transition-all duration-200 focus:ring-blue-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -350,14 +362,19 @@ export default function ActivityFinder() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="activities">
+                <Label
+                  htmlFor="activities"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   What activities are you interested in?
                 </Label>
                 <Textarea
                   id="activities"
-                  placeholder="e.g., camping, swimming, hiking, restaurants, museums, nightlife..."
-                  className={`min-h-[100px] ${
-                    errors.activities ? "border-red-500" : ""
+                  placeholder="e.g., camping, swimming, hiking, restaurants, museums, nightlife, wine tasting..."
+                  className={`min-h-[100px] transition-all duration-200 resize-none ${
+                    errors.activities
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "focus-visible:ring-blue-500"
                   }`}
                   value={activities}
                   onChange={(e) => {

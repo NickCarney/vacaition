@@ -207,29 +207,32 @@ export default function VacationFinder() {
   }
 
   return (
-    <div className="flex sm:flex-row flex-col w-full gap-4 justify-center">
-      <Card className="sm:w-full shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-t-lg">
-          <div className="flex items-center gap-2">
-            <PalmTree className="h-6 w-6 text-emerald-600" />
-            <CardTitle className="text-2xl text-emerald-700 text-center">
+    <div className="flex sm:flex-row flex-col w-full gap-6 justify-center">
+      <Card className="sm:w-full shadow-xl hover:shadow-2xl transition-shadow duration-300 border-0">
+        <CardHeader className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-t-lg">
+          <div className="flex items-center gap-2 justify-center">
+            <PalmTree className="h-7 w-7 text-emerald-600" />
+            <CardTitle className="text-3xl text-emerald-700">
               Vac<span className="text-[#123456] font-serif">AI</span>tion
             </CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-center text-base mt-2">
             Find your perfect getaway based on your preferences
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 pb-6">
           <form onSubmit={handleSubmit}>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="location">
+                <Label
+                  htmlFor="location"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   Where are you currently located?
                 </Label>
                 <Input
                   id="location"
-                  placeholder="Enter your current location"
+                  placeholder="e.g., New York City, Los Angeles, Chicago..."
                   value={locationRef}
                   onChange={(e) => {
                     setLocationRef(e.target.value);
@@ -238,17 +241,24 @@ export default function VacationFinder() {
                     }
                   }}
                   required
-                  className={errors.location ? "border-red-500" : ""}
+                  className={`transition-all duration-200 ${
+                    errors.location
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "focus-visible:ring-emerald-500"
+                  }`}
                 />
                 {errors.location && (
                   <p className="text-sm text-red-600">{errors.location}</p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-4">
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="transport">
+                    <Label
+                      htmlFor="transport"
+                      className="text-sm font-semibold text-gray-700"
+                    >
                       Preferred method of transport
                     </Label>
                     <Select
@@ -263,13 +273,15 @@ export default function VacationFinder() {
                     >
                       <SelectTrigger
                         id="transport"
-                        className={`w-fit ${
-                          errors.transport ? "border-red-500" : ""
+                        className={`w-full transition-all duration-200 ${
+                          errors.transport
+                            ? "border-red-500 focus:ring-red-500"
+                            : "focus:ring-emerald-500"
                         }`}
                       >
                         <SelectValue placeholder="Select transport method" />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-200">
+                      <SelectContent>
                         <SelectItem value="air">Air</SelectItem>
                         <SelectItem value="car">Car</SelectItem>
                         <SelectItem value="bike">Bike</SelectItem>
@@ -282,14 +294,21 @@ export default function VacationFinder() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="travelTime">Travel time</Label>
+                    <Label
+                      htmlFor="travelTime"
+                      className="text-sm font-semibold text-gray-700"
+                    >
+                      Travel time
+                    </Label>
                     <div className="flex gap-2">
                       <Input
                         id="travelTime"
                         type="number"
                         placeholder="Enter time"
-                        className={`w-[120px] ${
-                          errors.travelTime ? "border-red-500" : ""
+                        className={`flex-1 transition-all duration-200 ${
+                          errors.travelTime
+                            ? "border-red-500 focus-visible:ring-red-500"
+                            : "focus-visible:ring-emerald-500"
                         }`}
                         min="1"
                         max={timeUnit === "hours" ? "24" : "1440"}
@@ -303,7 +322,7 @@ export default function VacationFinder() {
                         required
                       />
                       <Select value={timeUnit} onValueChange={setTimeUnit}>
-                        <SelectTrigger className="w-[110px]">
+                        <SelectTrigger className="w-[120px] transition-all duration-200 focus:ring-emerald-500">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -322,14 +341,19 @@ export default function VacationFinder() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="activities">
+                <Label
+                  htmlFor="activities"
+                  className="text-sm font-semibold text-gray-700"
+                >
                   Activities you would like to have
                 </Label>
                 <Textarea
                   id="activities"
-                  placeholder="E.g., hiking, swimming, sightseeing, local cuisine..."
-                  className={`min-h-[100px] ${
-                    errors.activities ? "border-red-500" : ""
+                  placeholder="E.g., hiking, swimming, sightseeing, local cuisine, nightlife, museums..."
+                  className={`min-h-[100px] transition-all duration-200 resize-none ${
+                    errors.activities
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "focus-visible:ring-emerald-500"
                   }`}
                   value={activities}
                   onChange={(e) => {
@@ -347,63 +371,88 @@ export default function VacationFinder() {
             </div>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-end bg-gradient-to-r from-emerald-50 to-teal-50 rounded-b-lg">
+        <CardFooter className="flex justify-between items-center bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-b-lg">
+          {isSubmitted && (
+            <p className="text-xs text-emerald-600 font-medium">
+              {suggestions.length}{" "}
+              {suggestions.length === 1 ? "suggestion" : "suggestions"} found
+            </p>
+          )}
           <Button
             type="submit"
             onClick={handleSubmit}
             disabled={isLoading}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 ml-auto shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
           >
-            <PlaneTakeoff className="mr-2 h-4 w-4" />
-            {isLoading ? "Searching..." : "Find Vacations"}
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Searching...
+              </>
+            ) : (
+              <>
+                <PlaneTakeoff className="mr-2 h-4 w-4" />
+                Find Vacations
+              </>
+            )}
           </Button>
         </CardFooter>
-
-        {isSubmitted && (
-          <div className="p-4 bg-emerald-50 rounded-b-lg border-t border-emerald-100">
-            <p className="text-sm text-emerald-700">
-              Searching for vacations near <strong>{location}</strong>,
-              traveling by <strong>{transport}</strong>, within{" "}
-              <strong>
-                {travelTime} {timeUnit}
-              </strong>
-              , with activities like <strong>{activities}</strong>.
-            </p>
-          </div>
-        )}
       </Card>
 
       {isSubmitted && (
-        <div className="w-full">
-          <div>
-            <p>
+        <Card className="w-full shadow-lg animate-in fade-in duration-500">
+          <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50">
+            <CardTitle className="text-2xl text-emerald-700 flex items-center gap-2">
+              <PalmTree className="h-6 w-6" />
               {destination}
-              <br />
+            </CardTitle>
+            <CardDescription className="text-base mt-2">
               {response}
-            </p>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
             {!isMapReady && (
-              <div className="flex items-center justify-center w-full h-[500px] bg-gray-100 rounded-lg">
-                <p className="text-gray-600">Loading map...</p>
+              <div className="flex flex-col items-center justify-center w-full h-[500px] bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
+                <p className="text-gray-600 font-medium">
+                  Loading your route...
+                </p>
               </div>
             )}
             {isMapReady && (
-              <GoogleMap
-                // center={{ lat: 40.7128, lng: -74.006 }}
-                // zoom={10}
-                mapContainerStyle={{ width: "100%", height: "500px" }}
-                options={{
-                  draggable: true,
-                  scrollwheel: true,
-                  disableDefaultUI: false,
-                }}
-              >
-                {directionsResponse && (
-                  <DirectionsRenderer directions={directionsResponse} />
-                )}
-              </GoogleMap>
+              <div className="rounded-b-lg overflow-hidden">
+                <GoogleMap
+                  mapContainerStyle={{ width: "100%", height: "500px" }}
+                  options={{
+                    draggable: true,
+                    scrollwheel: true,
+                    disableDefaultUI: false,
+                    styles: [
+                      {
+                        featureType: "poi",
+                        elementType: "labels",
+                        stylers: [{ visibility: "off" }],
+                      },
+                    ],
+                  }}
+                >
+                  {directionsResponse && (
+                    <DirectionsRenderer directions={directionsResponse} />
+                  )}
+                </GoogleMap>
+              </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+          <CardFooter className="bg-gradient-to-r from-emerald-50 to-teal-50">
+            <Button
+              onClick={handleSubmit}
+              variant="outline"
+              className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition-all"
+            >
+              Not a fan? Try again!
+            </Button>
+          </CardFooter>
+        </Card>
       )}
       {/* {isSubmitted && (
           <Button onClick={handleSubmit}>Not a fan? Try again!</Button>
