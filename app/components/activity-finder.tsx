@@ -235,7 +235,7 @@ export default function ActivityFinder() {
         ]);
       }
       setIsSubmitted(true);
-    } catch (error) {
+    } catch {
       setRecommendations([
         {
           name: "Error",
