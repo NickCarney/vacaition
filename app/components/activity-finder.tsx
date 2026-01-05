@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, ExternalLink, Search } from "lucide-react";
+import { MapPin, ExternalLink, Search, Navigation } from "lucide-react";
 
 import { useLoadScript } from "@react-google-maps/api";
 import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
@@ -53,6 +53,7 @@ export default function ActivityFinder() {
   const [recommendations, setRecommendations] = useState<
     ActivityRecommendation[]
   >([]);
+  const [streamingText, setStreamingText] = useState<string>("");
   const [errors, setErrors] = useState({
     destination: "",
     travelDistance: "",
@@ -66,6 +67,7 @@ export default function ActivityFinder() {
   );
   const [isMapReady, setIsMapReady] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [showMapPicker, setShowMapPicker] = useState<string | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
@@ -88,6 +90,34 @@ export default function ActivityFinder() {
         }
       });
     });
+  };
+
+  // Open directions in maps app
+  const openDirections = (destinationLoc: string, provider: string) => {
+    const encodedOrigin = encodeURIComponent(destination);
+    const encodedDestination = encodeURIComponent(destinationLoc);
+
+    let mapsUrl = '';
+
+    switch (provider) {
+      case 'google':
+        mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodedOrigin}&destination=${encodedDestination}`;
+        break;
+      case 'apple':
+        mapsUrl = `http://maps.apple.com/?saddr=${encodedOrigin}&daddr=${encodedDestination}`;
+        break;
+      case 'waze':
+        mapsUrl = `https://waze.com/ul?q=${encodedDestination}&navigate=yes`;
+        break;
+      case 'citymapper':
+        mapsUrl = `https://citymapper.com/directions?endcoord=&endname=${encodedDestination}&startcoord=&startname=${encodedOrigin}`;
+        break;
+      default:
+        mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodedOrigin}&destination=${encodedDestination}`;
+    }
+
+    window.open(mapsUrl, "_blank");
+    setShowMapPicker(null);
   };
 
   // Effect to geocode all activities and the starting location
@@ -197,6 +227,9 @@ export default function ActivityFinder() {
     }
 
     setIsLoading(true);
+    setIsSubmitted(true);
+    setRecommendations([]);
+    setStreamingText("");
 
     try {
       const response = await fetch(`/api/activities`, {
@@ -212,29 +245,71 @@ export default function ActivityFinder() {
         }),
       });
 
-      const data = await response.json();
-
-      // Check if the response is an array of recommendations
-      if (Array.isArray(data)) {
-        setRecommendations(data);
-      } else if (data.error) {
-        // Handle error response from API
-        setRecommendations([
-          {
-            name: "Error",
-            description: data.error,
-          },
-        ]);
-      } else {
-        // Unexpected format
-        setRecommendations([
-          {
-            name: "Error",
-            description: "Unexpected response format",
-          },
-        ]);
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to fetch activities");
       }
-      setIsSubmitted(true);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Update streaming text
+        setStreamingText(buffer);
+      }
+
+      // Try to parse the complete JSON
+      try {
+        // Try to extract JSON from the buffer
+        let jsonString = buffer.trim();
+
+        // Look for JSON array or object in the response
+        const jsonMatch = jsonString.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonString = jsonMatch[0];
+        }
+
+        const data = JSON.parse(jsonString);
+
+        // Check if the response is an array of recommendations
+        if (Array.isArray(data)) {
+          setRecommendations(data);
+          setStreamingText("");
+        } else if (data.error) {
+          // Handle error response from API
+          setRecommendations([
+            {
+              name: "Error",
+              description: data.error,
+            },
+          ]);
+          setStreamingText("");
+        } else {
+          // Unexpected format
+          setRecommendations([
+            {
+              name: "Error",
+              description: "Unexpected response format",
+            },
+          ]);
+          setStreamingText("");
+        }
+      } catch (parseError) {
+        console.error("Failed to parse activities:", parseError, buffer);
+        setRecommendations([
+          {
+            name: "Error",
+            description: "Failed to parse response. Please try again.",
+          },
+        ]);
+        setStreamingText("");
+      }
     } catch {
       setRecommendations([
         {
@@ -243,7 +318,7 @@ export default function ActivityFinder() {
             "Sorry, we couldn't fetch recommendations at this time. Please try again.",
         },
       ]);
-      setIsSubmitted(true);
+      setStreamingText("");
     } finally {
       setIsLoading(false);
     }
@@ -507,37 +582,112 @@ export default function ActivityFinder() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Show streaming text */}
+                {streamingText && (
+                  <div className="p-4 border-2 border-blue-300 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 animate-pulse">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <h3 className="font-bold text-lg text-blue-700">
+                        Loading recommendations...
+                      </h3>
+                    </div>
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                      {streamingText}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Show completed recommendations */}
                 {recommendations.map((rec, index) => (
                   <div
                     key={index}
-                    className="p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="p-4 border-2 border-gray-100 rounded-lg bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-indigo-50 hover:border-blue-200 transition-all duration-300 hover:shadow-lg"
                   >
-                    <div className="flex justify-between items-start">
-                      <div className="">
-                        <h3 className="font-semibold text-lg text-gray-900 mb-2">
-                          {rec.name}
-                        </h3>
-                        <p className="text-gray-700 mb-2">{rec.description}</p>
-                        {rec.location && (
-                          <div className="flex items-center justify-center flex-wrap text-center">
-                            <p className="text-sm text-gray-600">
-                              {rec.location}
-                            </p>
-                            {rec.website && (
-                              <a
-                                href={rec.website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="ml-4 flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    <div className="mb-2">
+                      <h3 className="font-semibold text-lg text-gray-900 mb-3">
+                        {rec.name}
+                      </h3>
+                      <p className="text-gray-700 mb-3">{rec.description}</p>
+                    </div>
+
+                    {rec.location && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <p className="text-sm text-gray-600 flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {rec.location}
+                          </p>
+                          {rec.website && (
+                            <a
+                              href={rec.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                              Visit Website
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+
+                        {showMapPicker === `activity-${index}` ? (
+                          <div className="space-y-2 pt-2 border-t border-gray-200">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">Choose your maps app:</p>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                onClick={() => openDirections(rec.location || rec.name, 'google')}
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-600 text-blue-600 hover:bg-blue-100"
                               >
-                                Visit Website
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            )}
+                                Google Maps
+                              </Button>
+                              <Button
+                                onClick={() => openDirections(rec.location || rec.name, 'apple')}
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-600 text-blue-600 hover:bg-blue-100"
+                              >
+                                Apple Maps
+                              </Button>
+                              <Button
+                                onClick={() => openDirections(rec.location || rec.name, 'waze')}
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-600 text-blue-600 hover:bg-blue-100"
+                              >
+                                Waze
+                              </Button>
+                              <Button
+                                onClick={() => openDirections(rec.location || rec.name, 'citymapper')}
+                                size="sm"
+                                variant="outline"
+                                className="border-blue-600 text-blue-600 hover:bg-blue-100"
+                              >
+                                Citymapper
+                              </Button>
+                              <Button
+                                onClick={() => setShowMapPicker(null)}
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-400 text-gray-600 hover:bg-gray-100"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
+                        ) : (
+                          <Button
+                            onClick={() => setShowMapPicker(`activity-${index}`)}
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                          >
+                            <Navigation className="h-4 w-4 mr-1" />
+                            Directions
+                          </Button>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>

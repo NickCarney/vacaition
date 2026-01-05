@@ -28,35 +28,44 @@ For example:
 Make sure all recommendations are actually within the specified distance from their location. Only include real, specific places. Do not make up websites. If you don't know a website, omit the website field.
 Respond ONLY with the JSON array, no additional text.`;
 
-  try {
-    const response = await client.chat.completions.create({
-      model: "gpt-5-nano",
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      reasoning_effort: "low",
-      // max_tokens: 1500,
-    });
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const streamResponse = await client.chat.completions.create({
+          model: "gpt-5-nano",
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          reasoning_effort: "low",
+          stream: true,
+        });
 
-    const content = response.choices[0]?.message?.content || "";
-    console.log("API Response:", content);
+        for await (const chunk of streamResponse) {
+          const content = chunk.choices[0]?.delta?.content || "";
+          if (content) {
+            controller.enqueue(encoder.encode(content));
+          }
+        }
+      } catch (error) {
+        console.error("OpenAI API error:", error);
+        controller.enqueue(
+          encoder.encode(JSON.stringify({ error: "Internal Server Error" }))
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-    // Parse the JSON string from OpenAI and return it as JSON
-    try {
-      const parsedContent = JSON.parse(content);
-      return Response.json(parsedContent);
-    } catch (parseError) {
-      console.error("Failed to parse OpenAI response:", parseError);
-      return Response.json(
-        { error: "Invalid response format" },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
-    console.error("OpenAI API error:", error);
-    return Response.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain",
+      "Cache-Control": "no-cache",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }

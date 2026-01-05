@@ -22,14 +22,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { PlaneTakeoff, TreePalmIcon as PalmTree } from "lucide-react";
+import {
+  PlaneTakeoff,
+  TreePalmIcon as PalmTree,
+  Navigation,
+} from "lucide-react";
 
 import { useLoadScript } from "@react-google-maps/api";
 import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
 
+interface Activity {
+  name: string;
+  location: string;
+  description: string;
+}
+
 interface VacationSuggestion {
   destination: string;
   description: string;
+  activities: Activity[];
 }
 
 interface MarkerData {
@@ -52,6 +63,7 @@ export default function VacationFinder() {
   const [vacationSuggestions, setVacationSuggestions] = useState<
     VacationSuggestion[]
   >([]);
+  const [streamingVacations, setStreamingVacations] = useState<string[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<MarkerData | null>(null);
@@ -65,6 +77,7 @@ export default function VacationFinder() {
     travelTime: "",
     activities: "",
   });
+  const [showMapPicker, setShowMapPicker] = useState<string | null>(null);
 
   const validateInputs = () => {
     const newErrors = {
@@ -124,12 +137,16 @@ export default function VacationFinder() {
     setIsLoading(true);
     setIsMapReady(false);
     setLocation(locationRef);
+    setVacationSuggestions([]);
+    setStreamingVacations([]);
+    setMarkers([]);
+    setIsSubmitted(true);
 
     const newSuggestions: VacationSuggestion[] = [];
     const previousDestinations = vacationSuggestions.map((s) => s.destination);
 
     try {
-      // Fetch 3 vacation suggestions
+      // Fetch 3 vacation suggestions with streaming
       for (let i = 0; i < 3; i++) {
         const response = await fetch(`/api/find`, {
           method: "POST",
@@ -149,18 +166,66 @@ export default function VacationFinder() {
           }),
         });
 
-        const data = await response.json();
+        if (!response.ok || !response.body) {
+          throw new Error("Failed to fetch vacation");
+        }
 
-        if (data.destination && data.description) {
-          newSuggestions.push({
-            destination: data.destination,
-            description: data.description,
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // Add a placeholder for this streaming vacation
+        setStreamingVacations((prev) => [...prev, ""]);
+        const currentIndex = i;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Update the streaming text
+          setStreamingVacations((prev) => {
+            const updated = [...prev];
+            updated[currentIndex] = buffer;
+            return updated;
           });
         }
-      }
 
-      setVacationSuggestions(newSuggestions);
-      setIsSubmitted(true);
+        // Try to parse the complete JSON
+        try {
+          // Try to extract JSON from the buffer
+          let jsonString = buffer.trim();
+
+          // Look for JSON object in the response
+          const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            jsonString = jsonMatch[0];
+          }
+
+          const data = JSON.parse(jsonString);
+
+          if (data.destination && data.description) {
+            const newSuggestion = {
+              destination: data.destination,
+              description: data.description,
+              activities: data.activities || [],
+            };
+            newSuggestions.push(newSuggestion);
+            setVacationSuggestions([...newSuggestions]);
+
+            // Remove from streaming once added to suggestions
+            setStreamingVacations((prev) => {
+              const updated = [...prev];
+              updated[currentIndex] = "";
+              return updated;
+            });
+          }
+        } catch (parseError) {
+          console.error("Failed to parse vacation:", parseError, buffer);
+        }
+      }
     } catch (error) {
       console.error("Error fetching vacations:", error);
       setVacationSuggestions([
@@ -168,11 +233,12 @@ export default function VacationFinder() {
           destination: "Error",
           description:
             "Failed to fetch vacation destinations. Please try again.",
+          activities: [],
         },
       ]);
-      setIsSubmitted(true);
     } finally {
       setIsLoading(false);
+      setStreamingVacations([]);
     }
   };
 
@@ -198,45 +264,78 @@ export default function VacationFinder() {
     });
   };
 
-  // Effect to geocode all vacation destinations and the starting location
+  // Open directions in maps app
+  const openDirections = (destination: string, provider: string) => {
+    const encodedOrigin = encodeURIComponent(location);
+    const encodedDestination = encodeURIComponent(destination);
+
+    let mapsUrl = '';
+
+    switch (provider) {
+      case 'google':
+        mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodedOrigin}&destination=${encodedDestination}`;
+        break;
+      case 'apple':
+        mapsUrl = `http://maps.apple.com/?saddr=${encodedOrigin}&daddr=${encodedDestination}`;
+        break;
+      case 'waze':
+        mapsUrl = `https://waze.com/ul?q=${encodedDestination}&navigate=yes`;
+        break;
+      case 'citymapper':
+        mapsUrl = `https://citymapper.com/directions?endcoord=&endname=${encodedDestination}&startcoord=&startname=${encodedOrigin}`;
+        break;
+      default:
+        mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodedOrigin}&destination=${encodedDestination}`;
+    }
+
+    window.open(mapsUrl, "_blank");
+    setShowMapPicker(null);
+  };
+
+  // Effect to geocode starting location when first submitted
   useEffect(() => {
-    if (!isLoaded || !isSubmitted || vacationSuggestions.length === 0) return;
+    if (!isLoaded || !isSubmitted || !location) return;
 
-    const geocodeVacations = async () => {
-      setIsMapReady(false);
-      const newMarkers: MarkerData[] = [];
-
-      // Geocode the starting location
+    const geocodeOrigin = async () => {
       const originCoords = await geocodeAddress(location);
       if (originCoords) {
-        newMarkers.push({
+        setMarkers([{
           position: originCoords,
           name: location,
           description: "Your starting location",
           isOrigin: true,
-        });
+        }]);
         setMapCenter(originCoords);
+        setIsMapReady(true);
       }
-
-      // Geocode all vacation destinations
-      for (const vacation of vacationSuggestions) {
-        const coords = await geocodeAddress(vacation.destination);
-        if (coords) {
-          newMarkers.push({
-            position: coords,
-            name: vacation.destination,
-            description: vacation.description,
-            isOrigin: false,
-          });
-        }
-      }
-
-      setMarkers(newMarkers);
-      setIsMapReady(true);
     };
 
-    geocodeVacations();
-  }, [isLoaded, isSubmitted, vacationSuggestions, location]);
+    geocodeOrigin();
+  }, [isLoaded, isSubmitted, location]);
+
+  // Effect to geocode each vacation as it's added
+  useEffect(() => {
+    if (!isLoaded || !isSubmitted || vacationSuggestions.length === 0) return;
+
+    const geocodeLatestVacation = async () => {
+      const latestVacation = vacationSuggestions[vacationSuggestions.length - 1];
+      const coords = await geocodeAddress(latestVacation.destination);
+
+      if (coords) {
+        setMarkers((prevMarkers) => [
+          ...prevMarkers,
+          {
+            position: coords,
+            name: latestVacation.destination,
+            description: latestVacation.description,
+            isOrigin: false,
+          },
+        ]);
+      }
+    };
+
+    geocodeLatestVacation();
+  }, [isLoaded, isSubmitted, vacationSuggestions]);
 
   // Auto-zoom map to fit all markers
   useEffect(() => {
@@ -345,6 +444,7 @@ export default function VacationFinder() {
                           <SelectItem value="car">Car</SelectItem>
                           <SelectItem value="bike">Bike</SelectItem>
                           <SelectItem value="train">Train</SelectItem>
+                          <SelectItem value="walk">Walk</SelectItem>
                         </SelectContent>
                       </Select>
                       {errors.transport && (
@@ -566,18 +666,186 @@ export default function VacationFinder() {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
+              {/* Show streaming vacations */}
+              {streamingVacations.map((streamText, index) => (
+                streamText && (
+                  <div
+                    key={`streaming-${index}`}
+                    className="p-6 border-2 border-emerald-300 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 animate-pulse"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                      <h3 className="font-bold text-lg text-emerald-700">
+                        Loading destination {index + 1}...
+                      </h3>
+                    </div>
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                      {streamText}
+                    </pre>
+                  </div>
+                )
+              ))}
+
+              {/* Show completed vacations */}
               {vacationSuggestions.map((vacation, index) => (
                 <div
                   key={index}
-                  className="group p-6 border-2 border-gray-100 rounded-xl bg-gradient-to-br from-white to-gray-50 hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-200 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
+                  className="group p-6 border-2 border-gray-100 rounded-xl bg-gradient-to-br from-white to-gray-50 hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-200 transition-all duration-300 hover:shadow-lg"
                 >
-                  <h3 className="font-bold text-xl text-gray-900 mb-3 group-hover:text-emerald-700 transition-colors flex items-center gap-2">
-                    <PalmTree className="h-5 w-5" />
-                    {vacation.destination}
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <h3 className="font-bold text-xl text-gray-900 group-hover:text-emerald-700 transition-colors flex items-center gap-2">
+                      <PalmTree className="h-5 w-5" />
+                      {vacation.destination}
+                    </h3>
+                  </div>
+                  <p className="text-gray-700 leading-relaxed mb-4">
                     {vacation.description}
                   </p>
+                  <div className="mb-4">
+                    {showMapPicker === `vacation-${index}` ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-gray-700 mb-2">Choose your maps app:</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            onClick={() => openDirections(vacation.destination, 'google')}
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-600 text-emerald-600 hover:bg-emerald-100"
+                          >
+                            Google Maps
+                          </Button>
+                          <Button
+                            onClick={() => openDirections(vacation.destination, 'apple')}
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-600 text-emerald-600 hover:bg-emerald-100"
+                          >
+                            Apple Maps
+                          </Button>
+                          <Button
+                            onClick={() => openDirections(vacation.destination, 'waze')}
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-600 text-emerald-600 hover:bg-emerald-100"
+                          >
+                            Waze
+                          </Button>
+                          <Button
+                            onClick={() => openDirections(vacation.destination, 'citymapper')}
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-600 text-emerald-600 hover:bg-emerald-100"
+                          >
+                            Citymapper
+                          </Button>
+                          <Button
+                            onClick={() => setShowMapPicker(null)}
+                            size="sm"
+                            variant="outline"
+                            className="border-gray-400 text-gray-600 hover:bg-gray-100"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={() => setShowMapPicker(`vacation-${index}`)}
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 flex-shrink-0"
+                      >
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Directions
+                      </Button>
+                    )}
+                  </div>
+
+                  {vacation.activities && vacation.activities.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h4 className="font-semibold text-sm text-gray-900 mb-3 uppercase tracking-wide">
+                        Activities & Attractions
+                      </h4>
+                      <div className="space-y-3">
+                        {vacation.activities.map((activity, actIndex) => (
+                          <div
+                            key={actIndex}
+                            className="p-3 bg-white rounded-lg border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-200"
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-semibold text-sm text-gray-900 mb-1">
+                                  {activity.name}
+                                </h5>
+                                <p className="text-xs text-gray-600 mb-1">
+                                  {activity.location}
+                                </p>
+                                <p className="text-sm text-gray-700">
+                                  {activity.description}
+                                </p>
+                              </div>
+                            </div>
+                            {showMapPicker === `activity-${index}-${actIndex}` ? (
+                              <div className="space-y-2">
+                                <p className="text-xs font-semibold text-gray-700 mb-2">Choose your maps app:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    onClick={() => openDirections(activity.location, 'google')}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-100 text-xs"
+                                  >
+                                    Google Maps
+                                  </Button>
+                                  <Button
+                                    onClick={() => openDirections(activity.location, 'apple')}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-100 text-xs"
+                                  >
+                                    Apple Maps
+                                  </Button>
+                                  <Button
+                                    onClick={() => openDirections(activity.location, 'waze')}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-100 text-xs"
+                                  >
+                                    Waze
+                                  </Button>
+                                  <Button
+                                    onClick={() => openDirections(activity.location, 'citymapper')}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-100 text-xs"
+                                  >
+                                    Citymapper
+                                  </Button>
+                                  <Button
+                                    onClick={() => setShowMapPicker(null)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-gray-400 text-gray-600 hover:bg-gray-100 text-xs"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button
+                                onClick={() => setShowMapPicker(`activity-${index}-${actIndex}`)}
+                                size="sm"
+                                variant="outline"
+                                className="border-emerald-600 text-emerald-600 hover:bg-emerald-100 transition-all duration-200"
+                              >
+                                <Navigation className="h-3 w-3 mr-1" />
+                                Directions
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
